@@ -9,6 +9,7 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SPEAK_SH="$SCRIPT_DIR/speak.sh"
+LISTEN_SH="$SCRIPT_DIR/listen.sh"
 SETTINGS_SWIFT="$SCRIPT_DIR/Speak11Settings.swift"
 FAST=false
 [[ "${1:-}" == "--fast" ]] && FAST=true
@@ -253,6 +254,100 @@ if command -v shellcheck &>/dev/null; then
 else
     printf "  SKIP  shellcheck not installed\n"
 fi
+
+# ── 7b. listen.sh syntax ────────────────────────────────────────
+
+section "listen.sh syntax"
+
+check "bash syntax valid" "0" "$(bash -n "$LISTEN_SH" 2>/dev/null; echo $?)"
+
+if command -v shellcheck &>/dev/null; then
+    check "shellcheck passes" "0" "$(shellcheck -S warning "$LISTEN_SH" 2>/dev/null; echo $?)"
+else
+    printf "  SKIP  shellcheck not installed\n"
+fi
+
+# ── 7c. listen.sh API key guard ──────────────────────────────────
+
+section "listen.sh API key guard"
+
+_STUBS2=$(mktemp -d)
+printf '#!/bin/bash\nexit 1\n' > "$_STUBS2/security"
+printf '#!/bin/bash\nexit 0\n' > "$_STUBS2/osascript"
+printf '#!/bin/bash\nexit 0\n' > "$_STUBS2/curl"
+chmod +x "$_STUBS2/security" "$_STUBS2/osascript" "$_STUBS2/curl"
+
+# Create a dummy audio file for listen.sh
+_DUMMY_AUDIO=$(mktemp /tmp/speak11_test_XXXXXX.wav)
+printf 'RIFF' > "$_DUMMY_AUDIO"
+
+check_exit "empty ELEVENLABS_API_KEY with no Keychain entry → exits 1" 1 \
+    bash -c 'env PATH="'"$_STUBS2"':$PATH" ELEVENLABS_API_KEY="" bash "'"$LISTEN_SH"'" "'"$_DUMMY_AUDIO"'"'
+
+rm -rf "$_STUBS2" "$_DUMMY_AUDIO"
+
+# ── 7d. listen.sh STT config parsing ────────────────────────────
+
+section "listen.sh STT config parsing"
+
+resolve_stt_model() {
+    local conf="$1"
+    (
+        unset STT_MODEL_ID ELEVENLABS_STT_MODEL_ID
+        _CONFIG="$conf"
+        [ -f "$_CONFIG" ] && source "$_CONFIG"
+        STT_MODEL_ID="${ELEVENLABS_STT_MODEL_ID:-${STT_MODEL_ID:-scribe_v2}}"
+        echo "$STT_MODEL_ID"
+    )
+}
+
+resolve_stt_lang() {
+    local conf="$1" env_var="${2:-}"
+    (
+        unset STT_LANGUAGE ELEVENLABS_STT_LANGUAGE
+        [ -n "$env_var" ] && export ELEVENLABS_STT_LANGUAGE="$env_var"
+        _CONFIG="$conf"
+        [ -f "$_CONFIG" ] && source "$_CONFIG"
+        STT_LANGUAGE="${ELEVENLABS_STT_LANGUAGE:-${STT_LANGUAGE:-}}"
+        echo "$STT_LANGUAGE"
+    )
+}
+
+TMPCONF_STT=$(mktemp)
+printf 'STT_MODEL_ID="scribe_v1"\nSTT_LANGUAGE="ko"\n' > "$TMPCONF_STT"
+
+check "no config → default model scribe_v2" \
+    "scribe_v2" "$(resolve_stt_model /nonexistent)"
+
+check "config file STT model" \
+    "scribe_v1" "$(resolve_stt_model "$TMPCONF_STT")"
+
+check "no config → empty language (auto-detect)" \
+    "" "$(resolve_stt_lang /nonexistent)"
+
+check "config file STT language" \
+    "ko" "$(resolve_stt_lang "$TMPCONF_STT")"
+
+check "env var overrides config STT language" \
+    "ja" "$(resolve_stt_lang "$TMPCONF_STT" "ja")"
+
+rm -f "$TMPCONF_STT"
+
+# ── 7e. listen.sh missing audio file guard ───────────────────────
+
+section "listen.sh missing audio file guard"
+
+_STUBS3=$(mktemp -d)
+printf '#!/bin/bash\nexit 0\n' > "$_STUBS3/osascript"
+chmod +x "$_STUBS3/osascript"
+
+check_exit "no audio file argument → exits 1" 1 \
+    bash -c 'env PATH="'"$_STUBS3"':$PATH" bash "'"$LISTEN_SH"'"'
+
+check_exit "nonexistent audio file → exits 1" 1 \
+    bash -c 'env PATH="'"$_STUBS3"':$PATH" bash "'"$LISTEN_SH"'" /nonexistent/file.wav'
+
+rm -rf "$_STUBS3"
 
 # ── 8. install.command syntax ─────────────────────────────────────
 

@@ -1,11 +1,13 @@
 import Cocoa
 import ApplicationServices
+import AVFoundation
 
 // MARK: - Config paths
 
 private let configDir  = (NSHomeDirectory() as NSString).appendingPathComponent(".config/speak11")
 private let configPath = (configDir as NSString).appendingPathComponent("config")
 private let speakPath  = (NSHomeDirectory() as NSString).appendingPathComponent(".local/bin/speak.sh")
+private let listenPath = (NSHomeDirectory() as NSString).appendingPathComponent(".local/bin/listen.sh")
 
 // MARK: - Config model
 
@@ -17,6 +19,8 @@ struct Config {
     var style:           Double = 0.0
     var useSpeakerBoost: Bool   = true
     var speed:           Double = 1.0
+    var sttModelId:      String = "scribe_v2"
+    var sttLanguage:     String = ""          // empty = auto-detect
 
     static func load() -> Config {
         var c = Config()
@@ -42,6 +46,8 @@ struct Config {
             case "STYLE":            c.style            = Double(value) ?? c.style
             case "USE_SPEAKER_BOOST":c.useSpeakerBoost  = value == "true" || value == "1"
             case "SPEED":            c.speed            = Double(value) ?? c.speed
+            case "STT_MODEL_ID":     c.sttModelId       = value
+            case "STT_LANGUAGE":     c.sttLanguage      = value
             default: break
             }
         }
@@ -59,6 +65,8 @@ struct Config {
             "STYLE=\"\(String(format: "%.2f", style))\"",
             "USE_SPEAKER_BOOST=\"\(useSpeakerBoost ? "true" : "false")\"",
             "SPEED=\"\(String(format: "%.2f", speed))\"",
+            "STT_MODEL_ID=\"\(sttModelId)\"",
+            "STT_LANGUAGE=\"\(sttLanguage)\"",
         ]
         try? (lines.joined(separator: "\n") + "\n")
             .write(toFile: configPath, atomically: true, encoding: .utf8)
@@ -105,12 +113,30 @@ private let styleSteps: [(label: String, value: Double)] = [
     ("0.75", 0.75), ("1.0 — max", 1.0),
 ]
 
-// MARK: - Global hotkey ⌥⇧/ → speak.sh
+private let sttModels: [(name: String, id: String)] = [
+    ("Scribe v2 — latest",  "scribe_v2"),
+    ("Scribe v1",           "scribe_v1"),
+]
+
+private let sttLanguages: [(name: String, code: String)] = [
+    ("Auto-detect", ""),
+    ("English",     "en"),
+    ("Korean",      "ko"),
+    ("Japanese",    "ja"),
+    ("Chinese",     "zh"),
+    ("Spanish",     "es"),
+    ("French",      "fr"),
+    ("German",      "de"),
+]
+
+// MARK: - Global hotkeys
 //
-// Keycode 44 = forward slash on ANSI/ISO keyboards (US and most layouts).
+// Keycode 44 = forward slash (⌥⇧/ → TTS)
+// Keycode 47 = period       (⌥⇧. → STT)
 // Option+Shift must be set — no Control or Command.
 
-private let kHotkeyCode: Int64 = 44
+private let kTTSHotkeyCode: Int64 = 44
+private let kSTTHotkeyCode: Int64 = 47
 
 // Module-level tap reference so the C callback can re-enable it after a timeout.
 private var globalTap: CFMachPort?
@@ -129,36 +155,42 @@ private let hotkeyCallback: CGEventTapCallBack = { _, type, event, _ in
     let code  = event.getIntegerValueField(.keyboardEventKeycode)
     let flags = event.flags.intersection([.maskAlternate, .maskShift, .maskControl, .maskCommand])
 
-    guard code == kHotkeyCode, flags == [.maskAlternate, .maskShift] else {
+    guard flags == [.maskAlternate, .maskShift] else {
         return Unmanaged.passRetained(event)
     }
 
-    // Fire speak.sh on a background thread — never block the event tap.
-    DispatchQueue.global(qos: .userInitiated).async {
-        // Simulate ⌘C directly via CGEvent so the settings app's own
-        // Accessibility grant is used — avoids the osascript/System Events
-        // path which doesn't inherit AX permission reliably from child processes.
-        let src = CGEventSource(stateID: .hidSystemState)
-        let cDown = CGEvent(keyboardEventSource: src, virtualKey: 8, keyDown: true)
-        cDown?.flags = .maskCommand
-        let cUp   = CGEvent(keyboardEventSource: src, virtualKey: 8, keyDown: false)
-        cUp?.flags = .maskCommand
-        cDown?.post(tap: .cgAnnotatedSessionEventTap)
-        cUp?.post(tap: .cgAnnotatedSessionEventTap)
-        // Wait for the clipboard to be updated before speak.sh reads it.
-        Thread.sleep(forTimeInterval: 0.2)
+    if code == kTTSHotkeyCode {
+        // ⌥⇧/ → TTS: speak selected text
+        DispatchQueue.global(qos: .userInitiated).async {
+            let src = CGEventSource(stateID: .hidSystemState)
+            let cDown = CGEvent(keyboardEventSource: src, virtualKey: 8, keyDown: true)
+            cDown?.flags = .maskCommand
+            let cUp   = CGEvent(keyboardEventSource: src, virtualKey: 8, keyDown: false)
+            cUp?.flags = .maskCommand
+            cDown?.post(tap: .cgAnnotatedSessionEventTap)
+            cUp?.post(tap: .cgAnnotatedSessionEventTap)
+            Thread.sleep(forTimeInterval: 0.2)
 
-        DispatchQueue.main.async { appDelegateRef?.setSpeaking(true) }
+            DispatchQueue.main.async { appDelegateRef?.setSpeaking(true) }
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/bash")
-        task.arguments    = [speakPath]
-        task.standardInput = FileHandle.nullDevice
-        do    { try task.run(); task.waitUntilExit() }
-        catch {}
-        DispatchQueue.main.async { appDelegateRef?.setSpeaking(false) }
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/bin/bash")
+            task.arguments    = [speakPath]
+            task.standardInput = FileHandle.nullDevice
+            do    { try task.run(); task.waitUntilExit() }
+            catch {}
+            DispatchQueue.main.async { appDelegateRef?.setSpeaking(false) }
+        }
+        return nil
     }
-    return nil  // consume the keystroke
+
+    if code == kSTTHotkeyCode {
+        // ⌥⇧. → STT: toggle recording
+        DispatchQueue.main.async { appDelegateRef?.toggleRecording() }
+        return nil
+    }
+
+    return Unmanaged.passRetained(event)
 }
 
 // MARK: - App delegate
@@ -169,6 +201,11 @@ private let hotkeyCallback: CGEventTapCallBack = { _, type, event, _ in
     private var accessTimer: Timer?
     private var animTimer:   Timer?
     private var animPhase:   Double = 0
+
+    // STT recording state
+    private var isRecording    = false
+    private var audioRecorder: AVAudioRecorder?
+    private var recordingFile: URL?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -199,6 +236,141 @@ private let hotkeyCallback: CGEventTapCallBack = { _, type, event, _ in
         } else {
             statusItem.button?.image = NSImage(
                 systemSymbolName: "waveform", accessibilityDescription: "Speak11")
+        }
+    }
+
+    // MARK: - STT Recording
+
+    func toggleRecording() {
+        if isRecording {
+            stopRecordingAndTranscribe()
+        } else {
+            startRecording()
+        }
+    }
+
+    private func startRecording() {
+        // Request microphone permission
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            break
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+                DispatchQueue.main.async {
+                    if granted { self?.startRecording() }
+                    else { self?.showMicPermissionError() }
+                }
+            }
+            return
+        default:
+            showMicPermissionError()
+            return
+        }
+
+        let tmpDir = NSTemporaryDirectory()
+        let fileName = "speak11_recording_\(ProcessInfo.processInfo.globallyUniqueString).wav"
+        let fileURL = URL(fileURLWithPath: tmpDir).appendingPathComponent(fileName)
+        recordingFile = fileURL
+
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatLinearPCM),
+            AVSampleRateKey: 16000.0,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ]
+
+        do {
+            audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
+            audioRecorder?.record()
+            isRecording = true
+            setRecordingIcon(true)
+        } catch {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let msg = "Failed to start recording: \(error.localizedDescription)"
+                let escaped = msg.replacingOccurrences(of: "\"", with: "\\\"")
+                let script = "display dialog \"\(escaped)\" with title \"Speak11\" buttons {\"OK\"} default button \"OK\" with icon caution"
+                Process.launchedProcess(launchPath: "/usr/bin/osascript", arguments: ["-e", script])
+            }
+        }
+    }
+
+    private func stopRecordingAndTranscribe() {
+        guard let recorder = audioRecorder, let fileURL = recordingFile else { return }
+        recorder.stop()
+        audioRecorder = nil
+        isRecording = false
+
+        // Show transcribing animation
+        setSpeaking(true)
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/bin/bash")
+            task.arguments    = [listenPath, fileURL.path]
+            task.standardInput = FileHandle.nullDevice
+            do    { try task.run(); task.waitUntilExit() }
+            catch {}
+
+            // Clean up temp file
+            try? FileManager.default.removeItem(at: fileURL)
+
+            let success = task.terminationStatus == 0
+
+            DispatchQueue.main.async {
+                self?.setSpeaking(false)
+                if success {
+                    // Simulate ⌘V to paste the transcribed text
+                    self?.simulatePaste()
+                }
+            }
+        }
+    }
+
+    private func simulatePaste() {
+        let src = CGEventSource(stateID: .hidSystemState)
+        let vDown = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: true)
+        vDown?.flags = .maskCommand
+        let vUp   = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: false)
+        vUp?.flags = .maskCommand
+        vDown?.post(tap: .cgAnnotatedSessionEventTap)
+        vUp?.post(tap: .cgAnnotatedSessionEventTap)
+    }
+
+    private func setRecordingIcon(_ recording: Bool) {
+        animTimer?.invalidate()
+        animTimer = nil
+
+        if recording {
+            statusItem.button?.image = NSImage(
+                systemSymbolName: "mic.fill", accessibilityDescription: "Recording")
+        } else {
+            statusItem.button?.image = NSImage(
+                systemSymbolName: "waveform", accessibilityDescription: "Speak11")
+        }
+    }
+
+    private func showMicPermissionError() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let script = """
+            display dialog "Microphone access is required for speech-to-text." & return & return & \
+            "Open System Settings → Privacy & Security → Microphone and enable Speak11 Settings." \
+            with title "Speak11" buttons {"Open Settings", "OK"} default button "OK" with icon caution
+            """
+            let task = Process()
+            task.launchPath = "/usr/bin/osascript"
+            task.arguments = ["-e", script]
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            try? task.run()
+            task.waitUntilExit()
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            if output.contains("Open Settings") {
+                Process.launchedProcess(
+                    launchPath: "/usr/bin/open",
+                    arguments: ["x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"])
+            }
         }
     }
 
@@ -287,15 +459,29 @@ private let hotkeyCallback: CGEventTapCallBack = { _, type, event, _ in
         menu.addItem(boost)
         menu.addItem(.separator())
 
+        // STT settings
+        let sttHeader = NSMenuItem(title: "Speech-to-Text", action: nil, keyEquivalent: "")
+        sttHeader.isEnabled = false
+        menu.addItem(sttHeader)
+        menu.addItem(submenuItem("STT Language", items: buildSTTLanguageItems()))
+        menu.addItem(submenuItem("STT Model", items: buildSTTModelItems()))
+        menu.addItem(.separator())
+
         if !AXIsProcessTrusted() {
             let warn = NSMenuItem(
-                title:          "⚠️  Enable Accessibility for ⌥⇧/",
+                title:          "⚠️  Enable Accessibility for ⌥⇧/ and ⌥⇧.",
                 action:         #selector(requestAccessibility),
                 keyEquivalent:  "")
             warn.target = self
             menu.addItem(warn)
             menu.addItem(.separator())
         }
+
+        let keyItem = NSMenuItem(title: hasAPIKey() ? "API Key ✓" : "API Key ✗  (click to set)",
+                                 action: #selector(setAPIKey), keyEquivalent: "")
+        keyItem.target = self
+        menu.addItem(keyItem)
+        menu.addItem(.separator())
 
         let quit = NSMenuItem(title: "Quit",
                               action: #selector(NSApplication.terminate(_:)),
@@ -353,6 +539,20 @@ private let hotkeyCallback: CGEventTapCallBack = { _, type, event, _ in
                  repr: String(s.value), on: abs(s.value - config.style) < 0.01)
         }
         return items
+    }
+
+    private func buildSTTLanguageItems() -> [NSMenuItem] {
+        sttLanguages.map { lang in
+            item(lang.name, #selector(pickSTTLanguage(_:)),
+                 repr: lang.code, on: lang.code == config.sttLanguage)
+        }
+    }
+
+    private func buildSTTModelItems() -> [NSMenuItem] {
+        sttModels.map { m in
+            item(m.name, #selector(pickSTTModel(_:)),
+                 repr: m.id, on: m.id == config.sttModelId)
+        }
     }
 
     // MARK: Helpers
@@ -451,6 +651,56 @@ private let hotkeyCallback: CGEventTapCallBack = { _, type, event, _ in
     @objc private func toggleSpeakerBoost() {
         config.useSpeakerBoost.toggle()
         config.save()
+        rebuildMenu()
+    }
+
+    @objc private func pickSTTLanguage(_ sender: NSMenuItem) {
+        guard let code = sender.representedObject as? String else { return }
+        config.sttLanguage = code
+        config.save()
+        rebuildMenu()
+    }
+
+    @objc private func pickSTTModel(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        config.sttModelId = id
+        config.save()
+        rebuildMenu()
+    }
+
+    // MARK: API Key
+
+    private func hasAPIKey() -> Bool {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        task.arguments = ["find-generic-password", "-a", "speak11", "-s", "speak11-api-key", "-w"]
+        task.standardOutput = Pipe()
+        task.standardError  = FileHandle.nullDevice
+        do { try task.run(); task.waitUntilExit() } catch { return false }
+        return task.terminationStatus == 0
+    }
+
+    @objc private func setAPIKey() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "ElevenLabs API Key"
+        alert.informativeText = "Paste your API key from elevenlabs.io → Profile → API Keys.\nIt will be stored securely in Keychain."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 22))
+        field.placeholderString = "sk_..."
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let key = field.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !key.isEmpty else { return }
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        task.arguments = ["add-generic-password", "-a", "speak11", "-s", "speak11-api-key", "-w", key, "-U"]
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError  = FileHandle.nullDevice
+        do { try task.run(); task.waitUntilExit() } catch {}
         rebuildMenu()
     }
 }

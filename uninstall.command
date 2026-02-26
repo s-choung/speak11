@@ -13,7 +13,7 @@ trap cleanup EXIT
 # ── Keep terminal in the background — user interacts via dialogs ──
 osascript -e 'tell application "Terminal" to set miniaturized of front window to true' 2>/dev/null || true
 
-result=$(osascript -e 'button returned of (display dialog "This will completely remove Speak11:\n\n  • Stop and remove the menu bar app\n  • Remove Accessibility permission\n  • Remove the speak script\n  • Remove the Services workflow\n  • Remove settings and config\n  • Remove the API key from Keychain\n  • Remove the login item (if set)" with title "Speak11" buttons {"Cancel", "Uninstall"} default button "Cancel" with icon caution)' 2>/dev/null)
+result=$(osascript -e 'button returned of (display dialog "This will completely remove Speak11:\n\n  • Stop and remove the menu bar app\n  • Remove Accessibility permission\n  • Remove the speak and listen scripts\n  • Remove the Services workflow\n  • Remove settings and config\n  • Remove the API key from Keychain\n  • Remove the login item (if set)" with title "Speak11" buttons {"Cancel", "Uninstall"} default button "Cancel" with icon caution)' 2>/dev/null)
 [ "$result" = "Uninstall" ] || exit 0
 
 # ── Show terminal with progress ──────────────────────────────────
@@ -42,9 +42,10 @@ step "Accessibility permission removed"
 rm -rf "$HOME/Applications/Speak11 Settings.app"
 step "App bundle removed"
 
-# ── Remove the speak script symlink ───────────────────────────────
+# ── Remove the script symlinks ───────────────────────────────────
 rm -f "$HOME/.local/bin/speak.sh"
-step "Script symlink removed"
+rm -f "$HOME/.local/bin/listen.sh"
+step "Script symlinks removed"
 
 # ── Remove the Services workflow ──────────────────────────────────
 rm -rf "$HOME/Library/Services/Speak Selection.workflow"

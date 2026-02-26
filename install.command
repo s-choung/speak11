@@ -56,7 +56,7 @@ unspin() {
 osascript -e 'tell application "Terminal" to set miniaturized of front window to true' 2>/dev/null || true
 
 # ── Welcome ───────────────────────────────────────────────────────
-result=$(osascript -e 'button returned of (display dialog "Welcome to Speak11!\n\nThis installer will:\n  • Store your API key securely in Keychain\n  • Link the speak script into ~/.local/bin\n  • Build a menu bar app that registers ⌥⇧/ as a global hotkey\n\nYou will need a free ElevenLabs API key.\nGet one at elevenlabs.io → Profile → API Keys" with title "Speak11" buttons {"Quit", "Continue"} default button "Continue" with icon note)' 2>/dev/null)
+result=$(osascript -e 'button returned of (display dialog "Welcome to Speak11!\n\nThis installer will:\n  • Store your API key securely in Keychain\n  • Link the speak and listen scripts into ~/.local/bin\n  • Build a menu bar app that registers ⌥⇧/ (TTS) and ⌥⇧. (STT) as global hotkeys\n\nYou will need a free ElevenLabs API key.\nGet one at elevenlabs.io → Profile → API Keys" with title "Speak11" buttons {"Quit", "Continue"} default button "Continue" with icon note)' 2>/dev/null)
 [ "$result" = "Quit" ] && exit 0
 
 # ── API Key ───────────────────────────────────────────────────────
@@ -89,7 +89,8 @@ step "API key stored in Keychain"
 # ── Install speak.sh ──────────────────────────────────────────────
 mkdir -p "$INSTALL_DIR"
 ln -sf "$SCRIPT_DIR/speak.sh" "$INSTALL_DIR/speak.sh"
-step "Script linked to ~/.local/bin"
+ln -sf "$SCRIPT_DIR/listen.sh" "$INSTALL_DIR/listen.sh"
+step "Scripts linked to ~/.local/bin"
 
 # ── Install Automator Quick Action ────────────────────────────────
 mkdir -p "$SERVICES_DIR/$WORKFLOW_NAME/Contents"
@@ -355,6 +356,8 @@ if [ "$settings_result" = "Install" ]; then
     <true/>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Speak11 needs microphone access for speech-to-text transcription.</string>
 </dict>
 </plist>
 END_PLIST
@@ -412,7 +415,7 @@ SWIFT_END
         # Default config
         mkdir -p "$HOME/.config/speak11"
         if [ ! -f "$HOME/.config/speak11/config" ]; then
-            printf 'VOICE_ID="pFZP5JQG7iQjIQuC4Bku"\nMODEL_ID="eleven_flash_v2_5"\nSTABILITY="0.50"\nSIMILARITY_BOOST="0.75"\nSTYLE="0.00"\nUSE_SPEAKER_BOOST="true"\nSPEED="1.00"\n' \
+            printf 'VOICE_ID="pFZP5JQG7iQjIQuC4Bku"\nMODEL_ID="eleven_flash_v2_5"\nSTABILITY="0.50"\nSIMILARITY_BOOST="0.75"\nSTYLE="0.00"\nUSE_SPEAKER_BOOST="true"\nSPEED="1.00"\nSTT_MODEL_ID="scribe_v2"\nSTT_LANGUAGE=""\n' \
                 > "$HOME/.config/speak11/config"
         fi
         step "Default config created"
@@ -431,7 +434,7 @@ fi
 
 # ── Done ──────────────────────────────────────────────────────────
 if [ "${settings_result:-}" = "Install" ] && [ "${compile_ok:-1}" -eq 0 ]; then
-    osascript -e 'display dialog "Speak11 is installed!\n\n⌥⇧/ (Option + Shift + /) speaks your selection anywhere — including Electron apps like Beeper, Slack, and VS Code.\n\nThe ⊶ icon in your menu bar lets you change voice, model, and speed.\n\nFirst use: open the menu bar icon and grant Accessibility access when prompted." with title "Speak11" buttons {"Done"} default button "Done" with icon note' 2>/dev/null
+    osascript -e 'display dialog "Speak11 is installed!\n\n⌥⇧/ (Option + Shift + /) speaks your selection anywhere.\n⌥⇧. (Option + Shift + .) records and transcribes speech to text.\n\nThe ⊶ icon in your menu bar lets you change voice, model, and speed.\n\nFirst use: open the menu bar icon and grant Accessibility access when prompted." with title "Speak11" buttons {"Done"} default button "Done" with icon note' 2>/dev/null
 else
     printf '\n  \033[32mInstallation complete.\033[0m\n\n'
     result=$(osascript -e 'button returned of (display dialog "Speak11 is installed!\n\nOne last step: assign a keyboard shortcut.\n\n1. System Settings will open\n2. Go to Keyboard Shortcuts → Services → Text\n3. Find \"Speak Selection\" and double-click to assign a shortcut\n\nSuggested: ⌃⌥S (Control+Option+S)" with title "Speak11" buttons {"Done", "Open System Settings"} default button "Open System Settings" with icon note)' 2>/dev/null)
