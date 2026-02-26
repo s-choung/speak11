@@ -56,7 +56,7 @@ unspin() {
 osascript -e 'tell application "Terminal" to set miniaturized of front window to true' 2>/dev/null || true
 
 # ── Welcome ───────────────────────────────────────────────────────
-result=$(osascript -e 'button returned of (display dialog "Welcome to Speak11!\n\nThis installer will:\n  • Store your API key securely in Keychain\n  • Link the speak and listen scripts into ~/.local/bin\n  • Build a menu bar app that registers ⌥⇧/ (TTS) and ⌥⇧. (STT) as global hotkeys\n\nYou will need a free ElevenLabs API key.\nGet one at elevenlabs.io → Profile → API Keys" with title "Speak11" buttons {"Quit", "Continue"} default button "Continue" with icon note)' 2>/dev/null)
+result=$(osascript -e 'button returned of (display dialog "Welcome to Speak11!\n\nThis installer will:\n  • Store your API key securely in Keychain\n  • Link the speak and listen scripts into ~/.local/bin\n  • Build a menu bar app that registers ⌥⇧/ (TTS) and ⌥⇧. (STT) as global hotkeys\n\nYou will need a free ElevenLabs API key.\nGet one at elevenlabs.io/app/developers/api-keys" with title "Speak11" buttons {"Quit", "Continue"} default button "Continue" with icon note)' 2>/dev/null)
 [ "$result" = "Quit" ] && exit 0
 
 # ── API Key ───────────────────────────────────────────────────────

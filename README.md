@@ -35,7 +35,7 @@
 3. Click **Continue**, paste your ElevenLabs API key, click **Install**
 4. Click **Install** when prompted about the settings app — this adds the menu bar icon and registers `⌥⇧/` (TTS) and `⌥⇧.` (STT) as global hotkeys
 
-> **Getting your API key:** sign in at [elevenlabs.io](https://elevenlabs.io) → click your profile icon → **Profile + API Key** → copy the key.
+> **Getting your API key:** sign in at [elevenlabs.io/app/developers/api-keys](https://elevenlabs.io/app/developers/api-keys) → create or copy your API key.
 
 ### First use
 

@@ -6,7 +6,7 @@
 # Setup: Set your API key and preferred voice below.
 
 # ── Configuration ──────────────────────────────────────────────────
-# Get your API key from: https://elevenlabs.io → Profile → API Keys
+# Get your API key from: https://elevenlabs.io/app/developers/api-keys
 ELEVENLABS_API_KEY="${ELEVENLABS_API_KEY:-$(security find-generic-password -a "speak11" -s "speak11-api-key" -w 2>/dev/null)}"
 
 # Load settings written by the menu bar settings app.

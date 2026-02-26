@@ -684,7 +684,7 @@ private let hotkeyCallback: CGEventTapCallBack = { _, type, event, _ in
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = "ElevenLabs API Key"
-        alert.informativeText = "Paste your API key from elevenlabs.io → Profile → API Keys.\nIt will be stored securely in Keychain."
+        alert.informativeText = "Paste your API key from elevenlabs.io/app/developers/api-keys.\nIt will be stored securely in Keychain."
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
         let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 22))
