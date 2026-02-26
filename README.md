@@ -5,8 +5,14 @@
 <h1 align="center">Speak11</h1>
 
 <p align="center">
-  Select text in any app, press <kbd>⌥</kbd><kbd>⇧</kbd><kbd>/</kbd>, hear it read aloud.<br>
-  Uses the <a href="https://elevenlabs.io">ElevenLabs</a> text-to-speech API. Requires a free API key.
+  Select text → press <kbd>⌥</kbd><kbd>⇧</kbd><kbd>/</kbd> → hear it read aloud (TTS).<br>
+  Press <kbd>⌥</kbd><kbd>⇧</kbd><kbd>.</kbd> → speak → press again → transcribed text is pasted (STT).<br>
+  Uses the <a href="https://elevenlabs.io">ElevenLabs</a> TTS &amp; STT APIs. Requires a free API key.
+</p>
+
+<p align="center">
+  Forked from <a href="https://github.com/smcantab/speak11">smcantab/speak11</a> by <a href="https://github.com/smcantab">Stefano Martiniani</a>.<br>
+  This fork adds speech-to-text (STT) support using ElevenLabs Scribe v2.
 </p>
 
 <p align="center">
@@ -33,12 +39,12 @@
 
 ### First use
 
-Once installed, the **waveform icon** appears in your menu bar. On first launch the app will ask for Accessibility permission — click **Allow** so it can register the global hotkey.
+Once installed, the **waveform icon** appears in your menu bar. On first launch the app will ask for Accessibility and Microphone permissions — grant both.
 
-- **Select any text** in any app → press `⌥⇧/` → audio plays
-- **Press `⌥⇧/` again** while audio is playing → stops immediately
+- **TTS:** Select any text in any app → press `⌥⇧/` → audio plays. Press again to stop.
+- **STT:** Press `⌥⇧.` → mic icon appears, speak → press `⌥⇧.` again → text is transcribed, copied to clipboard, and auto-pasted.
 
-The waveform icon pulses while audio is being generated and played, so you always know it's working.
+The waveform icon pulses while audio is being generated/played, and switches to a mic icon during recording.
 
 Your API key is stored in your macOS Keychain — never written to a file.
 
@@ -55,6 +61,9 @@ Click the **waveform icon** in the menu bar to change:
 | **Similarity** | 0.0 (low) to 1.0 (high) — how closely output matches the original voice |
 | **Style** | 0.0 (none) to 1.0 (max) — amplifies the voice's characteristic delivery; adds latency |
 | **Speaker Boost** | On / Off — subtle enhancement to voice similarity |
+| **STT Language** | Auto-detect · English · Korean · Japanese · Chinese · Spanish · French · German |
+| **STT Model** | Scribe v2 (latest) · Scribe v1 |
+| **API Key** | Set or update your ElevenLabs API key (stored in Keychain) |
 
 Settings take effect immediately — no restart needed.
 
@@ -80,7 +89,8 @@ Double-click **`uninstall.command`** — it removes everything including the Acc
 
 | Symptom | Fix |
 |---------|-----|
-| `⌥⇧/` does nothing | Grant Accessibility permission when prompted, or check System Settings → Privacy & Security → Accessibility |
+| `⌥⇧/` or `⌥⇧.` does nothing | Grant Accessibility permission when prompted, or check System Settings → Privacy & Security → Accessibility |
+| `⌥⇧.` no audio recorded | Grant Microphone permission: System Settings → Privacy & Security → Microphone |
 | Waveform icon not in menu bar | Open `~/Applications/Speak11 Settings.app` manually, or re-run `install.command` |
 | HTTP 401 | API key is wrong or expired — run `install.command` again |
 | HTTP 429 | Monthly character quota exceeded — check usage at [elevenlabs.io](https://elevenlabs.io) |
@@ -92,7 +102,7 @@ ElevenLabs' free tier includes a monthly character allowance — usually suffici
 
 ## License
 
-[Unlicense](LICENSE) — public domain. Created by [Stefano Martiniani](https://github.com/smcantab).
+[Unlicense](LICENSE) — public domain. Originally created by [Stefano Martiniani](https://github.com/smcantab). STT support added by [s-choung](https://github.com/s-choung).
 
 ---
 
@@ -111,6 +121,8 @@ SIMILARITY_BOOST="0.75"
 STYLE="0.00"
 USE_SPEAKER_BOOST="true"
 SPEED="1.00"
+STT_MODEL_ID="scribe_v2"
+STT_LANGUAGE=""              # empty = auto-detect
 ```
 
 ### Environment variables
