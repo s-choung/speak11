@@ -33,7 +33,7 @@
 1. [Download the repository](../../archive/refs/heads/main.zip) and unzip it
 2. Double-click **`install.command`**
 3. Click **Continue**, paste your ElevenLabs API key, click **Install**
-4. Click **Install** when prompted about the settings app — this adds the menu bar icon and registers `⌥⇧/` as a global hotkey
+4. Click **Install** when prompted about the settings app — this adds the menu bar icon and registers `⌥⇧/` (TTS) and `⌥⇧.` (STT) as global hotkeys
 
 > **Getting your API key:** sign in at [elevenlabs.io](https://elevenlabs.io) → click your profile icon → **Profile + API Key** → copy the key.
 
