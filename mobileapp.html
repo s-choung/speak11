@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Talk&Listen">
+<title>Talk&amp;Listen</title>
+<style>
+:root {
+  --bg: #000; --card: #1c1c1e; --card2: #2c2c2e;
+  --text: #fff; --sub: #8e8e93; --accent: #0a84ff;
+  --red: #ff453a; --green: #30d158; --yellow: #ffd60a;
+  --safe-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom);
+  --tab-bg: #1a1a1a; --tab-border: #333; --border: #333;
+}
+[data-theme="light"] {
+  --bg: #f2f2f7; --card: #fff; --card2: #e5e5ea;
+  --text: #111; --sub: #666; --accent: #0a84ff;
+  --red: #e53935; --green: #2e7d32; --yellow: #f9a825;
+  --tab-bg: #fff; --tab-border: #d1d1d6; --border: #d1d1d6;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; padding-top: var(--safe-top); }
+button { font-family: inherit; cursor: pointer; border: none; }
+input, textarea { font-family: inherit; }
+
+/* Tester banner */
+.tester-banner { background: #332800; color: var(--yellow); font-size: 12px; text-align: center; padding: 6px 12px; flex-shrink: 0; }
+[data-theme="light"] .tester-banner { background: #fff8e1; color: #6d4c00; }
+.tester-banner a { color: inherit; text-decoration: underline; font-weight: 600; }
+
+/* Tabs */
+.tabs { display: flex; border-top: 1px solid var(--tab-border); padding-bottom: var(--safe-bottom); background: var(--tab-bg); flex-shrink: 0; }
+.tab { flex: 1; padding: 10px 0 6px; text-align: center; background: none; color: var(--sub); font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.tab.active { color: var(--accent); }
+.tab svg { width: 24px; height: 24px; fill: currentColor; }
+
+/* Pages */
+.pages { flex: 1; overflow: hidden; position: relative; }
+.page { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 20px 16px; overflow-y: auto; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.page.active { opacity: 1; pointer-events: auto; }
+
+/* Common */
+h2 { font-size: 28px; font-weight: 700; margin-bottom: 16px; }
+.card { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.label { font-size: 13px; color: var(--sub); margin-bottom: 6px; }
+.error { color: var(--red); font-size: 13px; margin-top: 8px; text-align: center; }
+
+/* Speak */
+.text-area { width: 100%; min-height: 150px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; color: var(--text); font-size: 16px; resize: none; outline: none; }
+.text-area.has-default { color: var(--sub); opacity: 0.6; }
+.text-area.has-default:focus { color: var(--text); opacity: 1; }
+.text-area:focus { border-color: var(--accent); }
+.char-count { text-align: right; font-size: 12px; color: var(--sub); margin: 6px 0; }
+.speak-btn { width: 100%; padding: 16px; border-radius: 14px; font-size: 17px; font-weight: 600; color: #fff; }
+.speak-btn.ready { background: var(--accent); }
+.speak-btn.loading { background: var(--card2); color: var(--sub); }
+.speak-btn.playing { background: var(--red); }
+.progress-bar { width: 100%; height: 4px; background: var(--card2); border-radius: 2px; margin-top: 12px; overflow: hidden; display: none; }
+.progress-bar.show { display: block; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 2px; width: 0; transition: width .1s; }
+
+/* Listen */
+.listen-page { align-items: center; justify-content: center; gap: 16px; }
+.listen-page .footnote { position: absolute; bottom: 8px; left: 0; right: 0; }
+.rec-btn { width: 88px; height: 88px; border-radius: 50%; background: none; border: 4px solid var(--accent); display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+.rec-btn.recording { border-color: var(--red); }
+.rec-btn .mic { font-size: 36px; transition: .2s; }
+.rec-btn.recording .mic { display: none; }
+.rec-btn .stop-icon { display: none; width: 28px; height: 28px; border-radius: 6px; background: var(--red); }
+.rec-btn.recording .stop-icon { display: block; }
+.pulse { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 2px solid var(--red); opacity: 0; }
+.rec-btn.recording .pulse { animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(1.5); opacity: 0; } }
+.rec-time { font-size: 20px; font-variant-numeric: tabular-nums; color: var(--sub); min-height: 28px; }
+.rec-hint { font-size: 14px; color: var(--sub); }
+.result-box { width: 100%; background: var(--card); border-radius: 12px; padding: 16px; min-height: 60px; font-size: 16px; line-height: 1.5; max-height: 200px; overflow-y: auto; }
+.result-actions { display: flex; gap: 12px; }
+.result-actions button { padding: 10px 20px; border-radius: 10px; background: var(--card); color: var(--accent); font-size: 15px; font-weight: 500; }
+
+/* Waveform */
+.waveform { display: flex; align-items: center; gap: 3px; height: 40px; }
+.waveform .bar { width: 4px; border-radius: 2px; background: var(--accent); transition: height 50ms; }
+
+/* Settings */
+.setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.setting-row:last-child { border-bottom: none; }
+.setting-label { font-size: 15px; }
+.setting-value { font-size: 15px; color: var(--sub); text-align: right; }
+select { background: var(--card2); color: var(--text); border: none; border-radius: 8px; padding: 8px 12px; font-size: 15px; outline: none; appearance: none; -webkit-appearance: none; }
+.api-input { width: 100%; background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-size: 15px; outline: none; }
+.api-input:focus { border-color: var(--accent); }
+.api-actions { display: flex; gap: 8px; margin-top: 8px; }
+.api-actions button { flex: 1; padding: 10px; border-radius: 10px; font-size: 15px; font-weight: 500; }
+.btn-save { background: var(--accent); color: #fff; }
+.btn-clear { background: var(--card2); color: var(--red); }
+.api-status { display: flex; align-items: center; gap: 6px; padding: 10px 0; font-size: 14px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.on { background: var(--green); }
+.dot.off { background: var(--red); }
+.dot.test { background: var(--yellow); }
+.slider-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.slider-row:last-child { border-bottom: none; }
+.slider-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.slider-val { color: var(--sub); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.reset-btn { width: 100%; padding: 14px; border-radius: 12px; background: var(--card); color: var(--red); font-size: 16px; font-weight: 500; margin-top: 8px; }
+.footnote { text-align: center; font-size: 11px; color: var(--sub); padding: 16px 0 8px; opacity: 0.5; margin-top: auto; }
+.logo-text { fill: #eee; }
+[data-theme="light"] .logo-text { fill: #111; }
+.theme-toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; }
+.theme-toggle-label { font-size: 15px; }
+.theme-switch { width: 51px; height: 31px; border-radius: 16px; background: var(--card2); border: none; position: relative; transition: background .2s; }
+.theme-switch.on { background: var(--accent); }
+.theme-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.theme-switch.on::after { transform: translateX(20px); }
+</style>
+</head>
+<body>
+
+<!-- TESTER MODE BANNER -->
+<div class="tester-banner" id="testerBanner" style="display:none">
+  Tester Mode — 5,000 token limit. <a href="https://elevenlabs.io/app/developers/api-keys" target="_blank">Get your own key</a> for unlimited use.
+</div>
+
+<!-- PAGES -->
+<div class="pages">
+  <!-- SPEAK -->
+  <div class="page active" id="pg-speak">
+    <div style="margin-bottom:16px"><svg width="220" height="42" viewBox="0 0 280 52" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="48" height="48" rx="12" fill="#0a84ff"/><circle cx="19" cy="26" r="10" fill="white" fill-opacity="0.13"/><path d="M15.5 24v4h2.2l2.8 2.8V21.2L18 24h-2.5z" fill="white"/><path d="M22.5 23.5c0 .8-.5 1.5-1.2 1.8v-3.6c.7.3 1.2 1 1.2 1.8z" fill="white" opacity="0.6"/><circle cx="33" cy="26" r="10" fill="white" fill-opacity="0.13"/><rect x="31" y="21" width="4" height="7" rx="2" fill="white" opacity="0.9"/><path d="M29 26v1c0 2.2 1.8 4 4 4s4-1.8 4-4v-1" stroke="white" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.7"/><text x="64" y="33" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif" font-weight="700" font-size="24" letter-spacing="-0.5" class="logo-text">Talk<tspan fill="#0a84ff">&amp;</tspan>Listen</text></svg></div>
+    <textarea class="text-area has-default" id="ttsText" placeholder="말할 텍스트를 입력하세요...">Talk&amp;Listen, developed by Seokhyun Choung, is your personal Jarvis. An AI voice assistant inspired by Iron Man, designed to read any text aloud so you can learn by listening. This is a demo version.</textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0">
+      <select id="quickVoice" onchange="saveSetting('voiceId', this.value)" style="font-size:14px">
+        <option value="pFZP5JQG7iQjIQuC4Bku">Lily (British, raspy)</option>
+        <option value="Xb7hH8MSUJpSbSDYk0k2">Alice (British, confident)</option>
+        <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Calm)</option>
+        <option value="pNInz6obpgDQGcFmaJgB">Adam (Deep)</option>
+        <option value="AZnzlk1XvdvUeBnXmlld">Domi (Strong)</option>
+        <option value="TxGEqnHWrfWFTfGW9XjX">Josh (Young, deep)</option>
+        <option value="yoZ06aMxZJJ28mfd3POQ">Sam (Raspy)</option>
+      </select>
+      <span style="font-size:12px;color:var(--sub)"><span id="charCount">0</span>자</span>
+    </div>
+    <div id="ttsError" class="error" style="display:none"></div>
+    <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+    <button class="speak-btn ready" id="speakBtn" onclick="handleSpeak()">
+      ▶ Speak
+    </button>
+    <div class="footnote">Developed by Seokhyun Choung</div>
+  </div>
+
+  <!-- LISTEN -->
+  <div class="page listen-page" id="pg-listen">
+    <h2 style="align-self:flex-start">Listen</h2>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:100%">
+      <div class="waveform" id="waveform" style="display:none"></div>
+      <div class="rec-time" id="recTime"></div>
+      <button class="rec-btn" id="recBtn" onclick="handleRecord()">
+        <div class="pulse"></div>
+        <span class="mic">🎙</span>
+        <div class="stop-icon"></div>
+      </button>
+      <div class="rec-hint" id="recHint">탭하여 녹음</div>
+      <div id="sttError" class="error" style="display:none"></div>
+      <div class="result-box" id="resultBox" style="display:none"></div>
+      <div class="result-actions" id="resultActions" style="display:none">
+        <button onclick="copyResult()">📋 복사</button>
+        <button onclick="shareResult()">📤 공유</button>
+      </div>
+    </div>
+    <div class="footnote">Developed by Seokhyun Choung</div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="page" id="pg-settings">
+    <h2>Settings</h2>
+
+    <div class="card">
+      <div class="label">API Key</div>
+      <div class="api-status" id="apiStatus">
+        <span class="dot off"></span> <span>설정 안 됨</span>
+      </div>
+      <input class="api-input" id="apiInput" type="password" placeholder="ElevenLabs API 키 붙여넣기">
+      <div class="api-actions">
+        <button class="btn-save" onclick="saveApiKey()">저장</button>
+        <button class="btn-clear" onclick="clearApiKey()">삭제</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Voice</div>
+      <div class="setting-row">
+        <span class="setting-label">음성</span>
+        <select id="voiceSelect" onchange="saveSetting('voiceId', this.value)">
+          <option value="pFZP5JQG7iQjIQuC4Bku">Lily — British, raspy</option>
+          <option value="Xb7hH8MSUJpSbSDYk0k2">Alice — British, confident</option>
+          <option value="21m00Tcm4TlvDq8ikWAM">Rachel — Calm</option>
+          <option value="pNInz6obpgDQGcFmaJgB">Adam — Deep</option>
+          <option value="AZnzlk1XvdvUeBnXmlld">Domi — Strong</option>
+          <option value="TxGEqnHWrfWFTfGW9XjX">Josh — Young, deep</option>
+          <option value="yoZ06aMxZJJ28mfd3POQ">Sam — Raspy</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">커스텀 Voice ID</span>
+        <input class="api-input" id="customVoice" style="width:50%;font-size:13px;padding:8px" placeholder="비우면 프리셋 사용"
+          onchange="saveSetting('customVoiceId', this.value)">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">TTS Model</div>
+      <div class="setting-row">
+        <span class="setting-label">모델</span>
+        <select id="modelSelect" onchange="saveSetting('modelId', this.value)">
+          <option value="eleven_v3">v3 — Best quality</option>
+          <option value="eleven_flash_v2_5">Flash v2.5 — Fastest</option>
+          <option value="eleven_turbo_v2_5">Turbo v2.5 — ½ cost</option>
+          <option value="eleven_multilingual_v2">Multilingual v2</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Voice Settings</div>
+      <div class="slider-row">
+        <div class="slider-header"><span>Speed</span><span class="slider-val" id="speedVal">1.00×</span></div>
+        <input type="range" id="speedSlider" min="0.7" max="1.2" step="0.05" value="1.0"
+          oninput="updateSlider('speed', this.value, '×')">
+      </div>
+      <div class="slider-row">
+        <div class="slider-header"><span>Stability</span><span class="slider-val" id="stabilityVal">0.50</span></div>
+        <input type="range" id="stabilitySlider" min="0" max="1" step="0.05" value="0.5"
+          oninput="updateSlider('stability', this.value)">
+      </div>
+      <div class="slider-row">
+        <div class="slider-header"><span>Similarity Boost</span><span class="slider-val" id="similarityBoostVal">0.75</span></div>
+        <input type="range" id="similarityBoostSlider" min="0" max="1" step="0.05" value="0.75"
+          oninput="updateSlider('similarityBoost', this.value)">
+      </div>
+      <div class="slider-row">
+        <div class="slider-header"><span>Style</span><span class="slider-val" id="styleVal">0.00</span></div>
+        <input type="range" id="styleSlider" min="0" max="1" step="0.05" value="0"
+          oninput="updateSlider('style', this.value)">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">STT Settings</div>
+      <div class="setting-row">
+        <span class="setting-label">STT 모델</span>
+        <select id="sttModelSelect" onchange="saveSetting('sttModelId', this.value)">
+          <option value="scribe_v2">Scribe v2</option>
+          <option value="scribe_v1">Scribe v1</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">언어</span>
+        <select id="sttLangSelect" onchange="saveSetting('sttLanguage', this.value)">
+          <option value="">자동 감지</option>
+          <option value="en">English</option>
+          <option value="ko">한국어</option>
+          <option value="ja">日本語</option>
+          <option value="zh">中文</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Theme</div>
+      <div class="theme-toggle">
+        <span class="theme-toggle-label" id="themeLabel">Dark Mode</span>
+        <button class="theme-switch" id="themeSwitch" onclick="toggleTheme()"></button>
+      </div>
+    </div>
+
+    <button class="reset-btn" onclick="resetSettings()">기본값으로 초기화</button>
+
+    <div class="card" style="margin-top:12px">
+      <div class="label">iOS 단축어로 빠르게 실행하기</div>
+      <div style="font-size:14px;line-height:1.7;color:var(--sub)">
+        <p style="margin-bottom:12px">이 웹앱을 iPhone <b>뒷면 탭</b>이나 <b>액션 버튼</b>으로 바로 열 수 있습니다.</p>
+
+        <p style="color:var(--text);font-weight:600;margin-bottom:6px">설정 방법:</p>
+        <p>1. iPhone <b>단축어</b> 앱 열기</p>
+        <p>2. <b>+</b> → "URL 열기" 동작 추가</p>
+        <p>3. URL에 이 페이지 주소 입력:</p>
+        <p style="background:var(--card2);padding:8px;border-radius:8px;font-size:12px;font-family:monospace;margin:6px 0;word-break:break-all" id="guideURL">
+          (홈 화면에 추가한 후 여기에 URL 표시)
+        </p>
+        <p>4. 단축어 이름을 <b>"Talk&amp;Listen"</b>로 저장</p>
+
+        <p style="color:var(--text);font-weight:600;margin:12px 0 6px">뒷면 탭 연결:</p>
+        <p>설정 → 손쉬운 사용 → 터치 → 뒷면 탭</p>
+        <p>• 이중 탭 → "Talk&amp;Listen" 단축어 선택</p>
+
+        <p style="color:var(--text);font-weight:600;margin:12px 0 6px">액션 버튼 (iPhone 15 Pro+):</p>
+        <p>설정 → 액션 버튼 → 단축어 → "Talk&amp;Listen" 선택</p>
+
+        <p style="color:var(--text);font-weight:600;margin:12px 0 6px">Siri:</p>
+        <p>"시리야, Talk and Listen" — 단축어 이름 그대로 호출됩니다.</p>
+      </div>
+    </div>
+
+    <div class="footnote">Developed by Seokhyun Choung</div>
+    <div style="height:40px"></div>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('speak')" id="tab-speak">
+    <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+    Speak
+  </button>
+  <button class="tab" onclick="switchTab('listen')" id="tab-listen">
+    <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c0 3.1-2.55 5.6-5.59 5.91V21h-0.64v-4.09C8.64 16.6 6.09 14.1 6.09 11H4.5c0 3.73 2.94 6.79 6.5 7.14V21h2v-2.86c3.56-.35 6.5-3.41 6.5-7.14h-1.59z"/></svg>
+    Listen
+  </button>
+  <button class="tab" onclick="switchTab('settings')" id="tab-settings">
+    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg>
+    Settings
+  </button>
+</div>
+
+<script>
+// ── Test API Key (5,000 token limit) ──
+var TEST_API_KEY = 'f0045fbc2e314a11d97b0ae01de176e49bb448f389dada7d8887d1b7c5624a3d';
+
+// ── Config ──
+var DEFAULTS = {
+  voiceId: 'pFZP5JQG7iQjIQuC4Bku', customVoiceId: '',
+  modelId: 'eleven_flash_v2_5',
+  speed: 1.0, stability: 0.5, similarityBoost: 0.75, style: 0.0,
+  sttModelId: 'scribe_v2', sttLanguage: ''
+};
+
+function getConfig() {
+  try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('talkandlisten_config') || '{}')); }
+  catch(e) { return Object.assign({}, DEFAULTS); }
+}
+function saveSetting(key, val) {
+  var c = getConfig();
+  c[key] = val;
+  localStorage.setItem('talkandlisten_config', JSON.stringify(c));
+}
+function updateSlider(key, val, suffix) {
+  suffix = suffix || '';
+  document.getElementById(key + 'Val').textContent = parseFloat(val).toFixed(2) + suffix;
+  saveSetting(key, parseFloat(val));
+}
+function resetSettings() {
+  localStorage.setItem('talkandlisten_config', JSON.stringify(DEFAULTS));
+  loadSettingsUI();
+}
+
+// ── API Key ──
+function getApiKey() {
+  return localStorage.getItem('talkandlisten_api_key') || TEST_API_KEY;
+}
+function isUsingTestKey() {
+  return !localStorage.getItem('talkandlisten_api_key');
+}
+function saveApiKey() {
+  var k = document.getElementById('apiInput').value.trim();
+  if (!k) return;
+  localStorage.setItem('talkandlisten_api_key', k);
+  document.getElementById('apiInput').value = '';
+  updateApiStatus();
+}
+function clearApiKey() {
+  localStorage.removeItem('talkandlisten_api_key');
+  document.getElementById('apiInput').value = '';
+  updateApiStatus();
+}
+function updateApiStatus() {
+  var el = document.getElementById('apiStatus');
+  var banner = document.getElementById('testerBanner');
+  if (isUsingTestKey()) {
+    el.innerHTML = '<span class="dot test"></span><span>Tester Mode (5,000 token limit)</span>';
+    banner.style.display = 'block';
+  } else {
+    el.innerHTML = '<span class="dot on"></span><span>설정 완료 ✓</span>';
+    banner.style.display = 'none';
+  }
+}
+
+// ── Theme ──
+function getTheme() { return localStorage.getItem('talkandlisten_theme') || (window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light'); }
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  var sw = document.getElementById('themeSwitch');
+  var label = document.getElementById('themeLabel');
+  if (t === 'dark') { sw.classList.add('on'); label.textContent = 'Dark Mode'; }
+  else { sw.classList.remove('on'); label.textContent = 'Light Mode'; }
+}
+function toggleTheme() { var t = getTheme() === 'dark' ? 'light' : 'dark'; localStorage.setItem('talkandlisten_theme', t); applyTheme(t); }
+
+// ── Tabs ──
+function switchTab(name) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.getElementById('pg-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── TTS ──
+var ttsAudio = null;
+var ttsState = 'ready';
+
+function setTTSState(s) {
+  ttsState = s;
+  var btn = document.getElementById('speakBtn');
+  btn.className = 'speak-btn ' + s;
+  if (s === 'ready') btn.innerHTML = '▶ Speak';
+  else if (s === 'loading') btn.innerHTML = '⏳ 생성 중...';
+  else if (s === 'playing') btn.innerHTML = '⏹ Stop';
+}
+
+async function handleSpeak() {
+  if (ttsState === 'loading') return;
+  if (ttsState === 'playing') { stopTTS(); return; }
+
+  var text = document.getElementById('ttsText').value.trim();
+  if (!text) { showError('ttsError', '텍스트를 입력하세요.'); return; }
+  var apiKey = getApiKey();
+  if (!apiKey) { showError('ttsError', 'Settings에서 API 키를 먼저 설정하세요.'); return; }
+
+  hideError('ttsError');
+  setTTSState('loading');
+
+  var cfg = getConfig();
+  var voiceId = cfg.customVoiceId || cfg.voiceId;
+
+  try {
+    var res = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId + '/stream', {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: text,
+        model_id: cfg.modelId,
+        voice_settings: {
+          stability: cfg.stability,
+          similarity_boost: cfg.similarityBoost,
+          style: cfg.style,
+          speed: cfg.speed
+        }
+      })
+    });
+
+    if (!res.ok) {
+      var errText = await res.text();
+      throw new Error('API 오류 (' + res.status + '): ' + errText.slice(0, 100));
+    }
+
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    ttsAudio = new Audio(url);
+
+    var bar = document.getElementById('progressBar');
+    var fill = document.getElementById('progressFill');
+    bar.classList.add('show');
+
+    ttsAudio.onplay = function() { setTTSState('playing'); };
+    ttsAudio.ontimeupdate = function() {
+      if (ttsAudio && ttsAudio.duration) fill.style.width = (ttsAudio.currentTime / ttsAudio.duration * 100) + '%';
+    };
+    ttsAudio.onended = function() { setTTSState('ready'); bar.classList.remove('show'); fill.style.width = '0'; };
+    ttsAudio.onerror = function() { setTTSState('ready'); bar.classList.remove('show'); };
+
+    await ttsAudio.play();
+  } catch (e) {
+    showError('ttsError', e.message);
+    setTTSState('ready');
+  }
+}
+
+function stopTTS() {
+  if (ttsAudio) { ttsAudio.pause(); ttsAudio.currentTime = 0; ttsAudio = null; }
+  setTTSState('ready');
+  document.getElementById('progressBar').classList.remove('show');
+  document.getElementById('progressFill').style.width = '0';
+}
+
+// ── STT ──
+var mediaRecorder = null;
+var audioChunks = [];
+var recStartTime = 0;
+var recTimer = null;
+var sttState = 'idle';
+var waveformCtx = null;
+
+// Bug fix #5: centralized state reset
+function resetSTTState() {
+  sttState = 'idle';
+  if (recTimer) { clearInterval(recTimer); recTimer = null; }
+  document.getElementById('recBtn').classList.remove('recording');
+  document.getElementById('recHint').textContent = '탭하여 녹음';
+  document.getElementById('recTime').textContent = '';
+  document.getElementById('waveform').style.display = 'none';
+  // Bug fix #3: safe AudioContext close
+  if (waveformCtx) {
+    try { if (waveformCtx.state !== 'closed') waveformCtx.close(); } catch(e) {}
+    waveformCtx = null;
+  }
+  // Bug fix #4: stop lingering stream tracks
+  if (mediaRecorder && mediaRecorder.stream) {
+    try { mediaRecorder.stream.getTracks().forEach(function(t) { t.stop(); }); } catch(e) {}
+  }
+  mediaRecorder = null;
+  audioChunks = [];
+}
+
+async function handleRecord() {
+  if (sttState === 'transcribing') return;
+  if (sttState === 'recording') { stopRecording(); return; }
+
+  var apiKey = getApiKey();
+  if (!apiKey) { showError('sttError', 'Settings에서 API 키를 먼저 설정하세요.'); return; }
+
+  hideError('sttError');
+  document.getElementById('resultBox').style.display = 'none';
+  document.getElementById('resultActions').style.display = 'none';
+
+  var stream = null;
+  try {
+    // Bug fix #1: use simple { audio: true } — sampleRate is not a standard constraint
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(stream, { mimeType: getMimeType() });
+
+    mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = function() {
+      stream.getTracks().forEach(function(t) { t.stop(); });
+      transcribe();
+    };
+
+    mediaRecorder.start();
+    sttState = 'recording';
+    recStartTime = Date.now();
+
+    document.getElementById('recBtn').classList.add('recording');
+    document.getElementById('recHint').textContent = '탭하여 중지';
+
+    try { initWaveform(stream); } catch(wfErr) { console.warn('Waveform init failed:', wfErr); }
+
+    recTimer = setInterval(function() {
+      var elapsed = (Date.now() - recStartTime) / 1000;
+      var m = Math.floor(elapsed / 60);
+      var s = Math.floor(elapsed % 60);
+      var ms = Math.floor((elapsed % 1) * 10);
+      document.getElementById('recTime').textContent = m + ':' + String(s).padStart(2, '0') + '.' + ms;
+    }, 100);
+  } catch (e) {
+    // Bug fix #2 & #4: full cleanup on error, stop stream if obtained
+    if (stream) { try { stream.getTracks().forEach(function(t) { t.stop(); }); } catch(e2) {} }
+    showError('sttError', '마이크 접근 거부됨. 설정에서 허용해주세요.');
+    resetSTTState();
+  }
+}
+
+function getMimeType() {
+  if (MediaRecorder.isTypeSupported('audio/webm')) return 'audio/webm';
+  if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
+  return '';
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  if (recTimer) { clearInterval(recTimer); recTimer = null; }
+  document.getElementById('recBtn').classList.remove('recording');
+  document.getElementById('recHint').textContent = '변환 중...';
+  document.getElementById('waveform').style.display = 'none';
+  sttState = 'transcribing';
+  // Bug fix #3: safe AudioContext close
+  if (waveformCtx) {
+    try { if (waveformCtx.state !== 'closed') waveformCtx.close(); } catch(e) {}
+    waveformCtx = null;
+  }
+}
+
+async function transcribe() {
+  var apiKey = getApiKey();
+  var cfg = getConfig();
+  var mimeType = mediaRecorder ? mediaRecorder.mimeType : 'audio/webm';
+  var blob = new Blob(audioChunks, { type: mimeType });
+  var ext = blob.type.includes('webm') ? 'webm' : blob.type.includes('mp4') ? 'm4a' : 'wav';
+
+  var form = new FormData();
+  form.append('model_id', cfg.sttModelId);
+  form.append('file', blob, 'recording.' + ext);
+  if (cfg.sttLanguage) form.append('language_code', cfg.sttLanguage);
+
+  try {
+    var res = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey },
+      body: form
+    });
+
+    if (!res.ok) {
+      var errText = await res.text();
+      throw new Error('API 오류 (' + res.status + '): ' + errText.slice(0, 100));
+    }
+
+    var json = await res.json();
+    var text = json.text || '(변환 결과 없음)';
+
+    document.getElementById('resultBox').textContent = text;
+    document.getElementById('resultBox').style.display = 'block';
+    document.getElementById('resultActions').style.display = 'flex';
+  } catch (e) {
+    showError('sttError', e.message);
+  }
+
+  // Bug fix #2: always fully reset state
+  resetSTTState();
+}
+
+function copyResult() {
+  var text = document.getElementById('resultBox').textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    document.getElementById('resultActions').querySelector('button').textContent = '✅ 복사됨!';
+    setTimeout(function() { document.getElementById('resultActions').querySelector('button').textContent = '📋 복사'; }, 1500);
+  });
+}
+
+function shareResult() {
+  var text = document.getElementById('resultBox').textContent;
+  if (navigator.share) navigator.share({ text: text });
+  else copyResult();
+}
+
+// ── Waveform ──
+function initWaveform(stream) {
+  var wf = document.getElementById('waveform');
+  wf.style.display = 'flex';
+  wf.innerHTML = '';
+  var barCount = 24;
+  for (var i = 0; i < barCount; i++) {
+    var bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = '4px';
+    wf.appendChild(bar);
+  }
+
+  try {
+    waveformCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var src = waveformCtx.createMediaStreamSource(stream);
+    var analyser = waveformCtx.createAnalyser();
+    analyser.fftSize = 64;
+    src.connect(analyser);
+    var data = new Uint8Array(analyser.frequencyBinCount);
+
+    function draw() {
+      if (sttState !== 'recording') return;
+      try {
+        analyser.getByteFrequencyData(data);
+        var bars = wf.children;
+        for (var i = 0; i < bars.length; i++) {
+          var v = data[i % data.length] / 255;
+          bars[i].style.height = Math.max(4, v * 36) + 'px';
+        }
+      } catch(e) { return; }
+      requestAnimationFrame(draw);
+    }
+    draw();
+  } catch(e) {
+    console.warn('AudioContext creation failed:', e);
+  }
+}
+
+// ── UI Helpers ──
+function showError(id, msg) { var el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; }
+function hideError(id) { document.getElementById(id).style.display = 'none'; }
+
+document.getElementById('ttsText').addEventListener('input', function() {
+  document.getElementById('charCount').textContent = this.value.length;
+  this.classList.remove('has-default');
+});
+
+// ── Load Settings UI ──
+function loadSettingsUI() {
+  var c = getConfig();
+  document.getElementById('quickVoice').value = c.voiceId;
+  document.getElementById('voiceSelect').value = c.voiceId;
+  document.getElementById('customVoice').value = c.customVoiceId;
+  document.getElementById('modelSelect').value = c.modelId;
+  document.getElementById('speedSlider').value = c.speed;
+  document.getElementById('speedVal').textContent = c.speed.toFixed(2) + '×';
+  document.getElementById('stabilitySlider').value = c.stability;
+  document.getElementById('stabilityVal').textContent = c.stability.toFixed(2);
+  document.getElementById('similarityBoostSlider').value = c.similarityBoost;
+  document.getElementById('similarityBoostVal').textContent = c.similarityBoost.toFixed(2);
+  document.getElementById('styleSlider').value = c.style;
+  document.getElementById('styleVal').textContent = c.style.toFixed(2);
+  document.getElementById('sttModelSelect').value = c.sttModelId;
+  document.getElementById('sttLangSelect').value = c.sttLanguage;
+  updateApiStatus();
+}
+
+applyTheme(getTheme());
+loadSettingsUI();
+
+// Show current URL in the shortcut guide
+var guideEl = document.getElementById('guideURL');
+if (guideEl) guideEl.textContent = location.href;
+</script>
+</body>
+</html>

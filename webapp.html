@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talk&amp;Listen</title>
+<style>
+:root {
+  --bg: #fff; --bg2: #f5f5f5; --card: #fff; --border: #e5e5e5;
+  --text: #111; --sub: #666; --accent: #0a84ff;
+  --red: #e53935; --green: #2e7d32; --yellow: #f9a825;
+}
+[data-theme="dark"] {
+  --bg: #0a0a0a; --bg2: #141414; --card: #1c1c1e; --border: #2a2a2a;
+  --text: #eee; --sub: #8e8e93; --accent: #0a84ff;
+  --red: #ff453a; --green: #30d158; --yellow: #ffd60a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; }
+
+/* Tester banner */
+.tester-banner { position: fixed; top: 0; left: 0; right: 0; background: #332800; color: var(--yellow); font-size: 13px; text-align: center; padding: 6px; z-index: 100; display: none; }
+[data-theme="light"] .tester-banner { background: #fff8e1; color: #6d4c00; }
+.tester-banner a { color: inherit; font-weight: 600; }
+body.has-banner { padding-top: 30px; }
+body.has-banner .sidebar { top: 30px; height: calc(100vh - 30px); }
+
+/* Sidebar */
+.sidebar { width: 260px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; height: 100vh; flex-shrink: 0; }
+.sidebar-header { padding: 28px 20px 20px; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 14px 20px; color: var(--sub); font-size: 15px; font-weight: 500; cursor: pointer; border: none; background: none; width: 100%; text-align: left; border-radius: 0; transition: background .15s; }
+.nav-item:hover { background: var(--border); }
+.nav-item.active { color: var(--accent); background: rgba(10,132,255,0.1); }
+.nav-item svg { width: 22px; height: 22px; fill: currentColor; flex-shrink: 0; }
+.sidebar-footer { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+.theme-btn { display: flex; align-items: center; gap: 8px; background: none; border: none; color: var(--sub); font-size: 13px; cursor: pointer; padding: 6px 0; }
+.theme-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* Main */
+main { margin-left: 260px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.page { display: none; max-width: 900px; width: 100%; margin: 0 auto; padding: 32px 40px; flex-direction: column; flex: 1; }
+.page.active { display: flex; }
+.page h1 { font-size: 32px; font-weight: 700; margin-bottom: 4px; }
+.page-desc { color: var(--sub); font-size: 15px; margin-bottom: 20px; }
+.page-content { flex: 1; }
+.footnote { text-align: center; font-size: 12px; color: var(--sub); padding: 32px 0 20px; opacity: 0.5; margin-top: auto; }
+
+/* Cards */
+.section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sub); margin: 24px 0 8px; }
+.section-title:first-of-type { margin-top: 0; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+
+/* Text area */
+.text-area { width: 100%; min-height: 220px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; color: var(--text); font-size: 16px; resize: vertical; outline: none; line-height: 1.6; }
+.text-area.has-default { color: var(--sub); opacity: 0.6; }
+.text-area.has-default:focus { color: var(--text); opacity: 1; }
+.text-area:focus { border-color: var(--accent); }
+.char-count { text-align: right; font-size: 12px; color: var(--sub); margin: 4px 0 12px; }
+.error { color: var(--red); font-size: 13px; margin: 8px 0; }
+
+/* Buttons */
+.speak-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 32px; border-radius: 10px; font-size: 17px; font-weight: 600; color: #fff; border: none; cursor: pointer; }
+.speak-btn.ready { background: var(--accent); }
+.speak-btn.loading { background: var(--sub); opacity: 0.7; cursor: wait; }
+.speak-btn.playing { background: var(--red); }
+.progress-bar { width: 100%; height: 4px; background: var(--bg2); border-radius: 2px; margin-top: 12px; overflow: hidden; display: none; }
+.progress-bar.show { display: block; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 2px; width: 0; transition: width .1s; }
+.shortcut-hint { font-size: 12px; color: var(--sub); margin-top: 8px; }
+
+/* Listen page */
+.listen-controls { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.rec-btn { width: 64px; height: 64px; border-radius: 50%; background: none; border: 3px solid var(--accent); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; flex-shrink: 0; }
+.rec-btn.recording { border-color: var(--red); }
+.rec-btn .mic { font-size: 28px; }
+.rec-btn.recording .mic { display: none; }
+.rec-btn .stop-icon { display: none; width: 22px; height: 22px; border-radius: 4px; background: var(--red); }
+.rec-btn.recording .stop-icon { display: block; }
+.pulse { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 2px solid var(--red); opacity: 0; }
+.rec-btn.recording .pulse { animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(1.4); opacity: 0; } }
+.rec-info { flex: 1; }
+.rec-time { font-size: 18px; font-variant-numeric: tabular-nums; color: var(--text); min-height: 24px; }
+.rec-hint { font-size: 13px; color: var(--sub); }
+.waveform { display: flex; align-items: center; gap: 2px; height: 36px; margin-bottom: 16px; }
+.waveform .bar { width: 3px; border-radius: 2px; background: var(--accent); transition: height 50ms; }
+
+/* Drop zone */
+.drop-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; margin-bottom: 16px; }
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(10,132,255,0.04); }
+.drop-zone-text { font-size: 14px; color: var(--sub); margin-top: 8px; }
+.drop-zone-text strong { color: var(--accent); }
+.drop-zone-hint { font-size: 12px; color: var(--sub); margin-top: 4px; opacity: 0.7; }
+.drop-zone svg { width: 32px; height: 32px; fill: var(--sub); }
+.file-info { display: none; align-items: center; gap: 8px; font-size: 14px; padding: 10px 14px; background: var(--bg2); border-radius: 8px; margin-bottom: 12px; }
+.file-info.show { display: flex; }
+.file-info .remove { color: var(--red); background: none; border: none; cursor: pointer; font-size: 13px; margin-left: auto; }
+.transcribe-btn { display: none; padding: 10px 20px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; border: none; cursor: pointer; margin-bottom: 16px; }
+.transcribe-btn.show { display: inline-block; }
+
+/* Result */
+.result-card { display: none; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.result-card.show { display: block; }
+.result-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg2); border-bottom: 1px solid var(--border); font-size: 13px; color: var(--sub); }
+.result-header button { background: none; border: none; color: var(--accent); font-size: 13px; cursor: pointer; font-weight: 500; }
+.result-body { padding: 14px; font-size: 15px; line-height: 1.6; min-height: 40px; }
+
+/* Settings */
+.setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.setting-row:last-child { border-bottom: none; }
+.setting-label { font-size: 14px; }
+.setting-desc { font-size: 12px; color: var(--sub); }
+select { background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 14px; outline: none; }
+.api-input { width: 100%; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text); font-size: 14px; outline: none; }
+.api-input:focus { border-color: var(--accent); }
+.api-actions { display: flex; gap: 8px; margin-top: 8px; }
+.api-actions button { padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; border: none; cursor: pointer; }
+.btn-save { background: var(--accent); color: #fff; }
+.btn-clear { background: var(--bg2); color: var(--red); border: 1px solid var(--border); }
+.api-status { display: flex; align-items: center; gap: 6px; padding: 8px 0; font-size: 13px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-dot.on { background: var(--green); }
+.status-dot.off { background: var(--red); }
+.status-dot.test { background: var(--yellow); }
+.slider-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.slider-row:last-child { border-bottom: none; }
+.slider-header { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px; }
+.slider-val { color: var(--sub); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.reset-btn { padding: 10px 20px; border-radius: 8px; background: var(--bg2); color: var(--red); font-size: 14px; border: 1px solid var(--border); cursor: pointer; margin-top: 12px; }
+
+.logo-text { fill: #111; }
+[data-theme="dark"] .logo-text { fill: #eee; }
+
+@media (max-width: 768px) {
+  .sidebar { width: 56px; }
+  .sidebar-header, .nav-item span { display: none; }
+  .nav-item { justify-content: center; padding: 14px; }
+  main { margin-left: 56px; }
+  .page { padding: 24px 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- TESTER MODE BANNER -->
+<div class="tester-banner" id="testerBanner">
+  Tester Mode — 5,000 token limit. <a href="https://elevenlabs.io/app/developers/api-keys" target="_blank">Get your own key</a> for unlimited use.
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-header"><svg width="190" height="36" viewBox="0 0 280 52" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="48" height="48" rx="12" fill="#0a84ff"/><circle cx="19" cy="26" r="10" fill="white" fill-opacity="0.13"/><path d="M15.5 24v4h2.2l2.8 2.8V21.2L18 24h-2.5z" fill="white"/><path d="M22.5 23.5c0 .8-.5 1.5-1.2 1.8v-3.6c.7.3 1.2 1 1.2 1.8z" fill="white" opacity="0.6"/><circle cx="33" cy="26" r="10" fill="white" fill-opacity="0.13"/><rect x="31" y="21" width="4" height="7" rx="2" fill="white" opacity="0.9"/><path d="M29 26v1c0 2.2 1.8 4 4 4s4-1.8 4-4v-1" stroke="white" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.7"/><text x="64" y="33" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif" font-weight="700" font-size="24" letter-spacing="-0.5" class="logo-text">Talk<tspan fill="#0a84ff">&amp;</tspan>Listen</text></svg></div>
+  <button class="nav-item active" id="nav-speak" onclick="switchTab('speak')">
+    <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+    <span>Speak</span>
+  </button>
+  <button class="nav-item" id="nav-listen" onclick="switchTab('listen')">
+    <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c0 3.1-2.55 5.6-5.59 5.91V21h-0.64v-4.09C8.64 16.6 6.09 14.1 6.09 11H4.5c0 3.73 2.94 6.79 6.5 7.14V21h2v-2.86c3.56-.35 6.5-3.41 6.5-7.14h-1.59z"/></svg>
+    <span>Listen</span>
+  </button>
+  <button class="nav-item" id="nav-settings" onclick="switchTab('settings')">
+    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg>
+    <span>Settings</span>
+  </button>
+  <div class="sidebar-footer">
+    <button class="theme-btn" onclick="toggleTheme()">
+      <svg id="themeIcon" viewBox="0 0 24 24"><path d="M12 3a9 9 0 109 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 01-4.4 2.26 5.403 5.403 0 01-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+      <span id="themeLabel">Dark</span>
+    </button>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main>
+  <!-- Speak -->
+  <div class="page active" id="pg-speak">
+    <h1>Speak</h1>
+    <p class="page-desc">Enter text and hear it spoken aloud</p>
+    <textarea class="text-area has-default" id="ttsText" placeholder="Type or paste text here...">Talk&amp;Listen, developed by Seokhyun Choung, is your personal Jarvis. An AI voice assistant inspired by Iron Man, designed to read any text aloud so you can learn by listening. This is a demo version.</textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 12px">
+      <select id="quickVoice" onchange="saveSetting('voiceId', this.value)" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px">
+        <option value="pFZP5JQG7iQjIQuC4Bku">Lily (British, raspy)</option>
+        <option value="Xb7hH8MSUJpSbSDYk0k2">Alice (British, confident)</option>
+        <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Calm)</option>
+        <option value="pNInz6obpgDQGcFmaJgB">Adam (Deep)</option>
+        <option value="AZnzlk1XvdvUeBnXmlld">Domi (Strong)</option>
+        <option value="TxGEqnHWrfWFTfGW9XjX">Josh (Young, deep)</option>
+        <option value="yoZ06aMxZJJ28mfd3POQ">Sam (Raspy)</option>
+      </select>
+      <span style="font-size:12px;color:var(--sub)"><span id="charCount">0</span> characters</span>
+    </div>
+    <div id="ttsError" class="error" style="display:none"></div>
+    <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+    <button class="speak-btn ready" id="speakBtn" onclick="handleSpeak()">▶ Speak</button>
+    <div class="shortcut-hint">Ctrl+Enter to speak, Esc to stop</div>
+    <div class="footnote">Developed by Seokhyun Choung</div>
+  </div>
+
+  <!-- Listen -->
+  <div class="page" id="pg-listen">
+    <h1>Listen</h1>
+    <p class="page-desc">Record speech or upload audio for transcription</p>
+
+    <div class="section-title">Microphone</div>
+    <div class="card">
+      <div class="listen-controls">
+        <button class="rec-btn" id="recBtn" onclick="handleRecord()">
+          <div class="pulse"></div>
+          <span class="mic">🎙</span>
+          <div class="stop-icon"></div>
+        </button>
+        <div class="rec-info">
+          <div class="rec-time" id="recTime"></div>
+          <div class="rec-hint" id="recHint">Click to start recording</div>
+        </div>
+      </div>
+      <div class="waveform" id="waveform" style="display:none"></div>
+    </div>
+
+    <div class="section-title">Upload File</div>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+      <div class="drop-zone-text">Drag & drop an audio file, or <strong>browse</strong></div>
+      <div class="drop-zone-hint">MP3, WAV, M4A, WebM, OGG, FLAC</div>
+      <input type="file" id="fileInput" accept="audio/*" style="display:none" onchange="handleFileSelect(event)">
+    </div>
+    <div class="file-info" id="fileInfo">
+      <span id="fileName"></span>
+      <button class="remove" onclick="clearFile()">Remove</button>
+    </div>
+    <button class="transcribe-btn" id="transcribeBtn" onclick="transcribeFile()">Transcribe File</button>
+
+    <div id="sttError" class="error" style="display:none"></div>
+    <div class="result-card" id="resultCard">
+      <div class="result-header">
+        <span>Transcription</span>
+        <button onclick="copyResult()">Copy</button>
+      </div>
+      <div class="result-body" id="resultBody"></div>
+    </div>
+    <div class="footnote">Developed by Seokhyun Choung</div>
+  </div>
+
+  <!-- Settings -->
+  <div class="page" id="pg-settings">
+    <h1>Settings</h1>
+    <p class="page-desc">Configure API key, voice, and model preferences</p>
+
+    <div class="section-title">API Key</div>
+    <div class="card">
+      <div class="api-status" id="apiStatus"><span class="status-dot off"></span><span>Not configured</span></div>
+      <input class="api-input" id="apiInput" type="password" placeholder="Paste your ElevenLabs API key">
+      <div class="api-actions">
+        <button class="btn-save" onclick="saveApiKey()">Save</button>
+        <button class="btn-clear" onclick="clearApiKey()">Remove</button>
+      </div>
+    </div>
+
+    <div class="section-title">Voice</div>
+    <div class="card">
+      <div class="setting-row">
+        <span class="setting-label">Voice preset</span>
+        <select id="voiceSelect" onchange="saveSetting('voiceId', this.value)">
+          <option value="pFZP5JQG7iQjIQuC4Bku">Lily — British, raspy</option>
+          <option value="Xb7hH8MSUJpSbSDYk0k2">Alice — British, confident</option>
+          <option value="21m00Tcm4TlvDq8ikWAM">Rachel — Calm</option>
+          <option value="pNInz6obpgDQGcFmaJgB">Adam — Deep</option>
+          <option value="AZnzlk1XvdvUeBnXmlld">Domi — Strong</option>
+          <option value="TxGEqnHWrfWFTfGW9XjX">Josh — Young, deep</option>
+          <option value="yoZ06aMxZJJ28mfd3POQ">Sam — Raspy</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div><span class="setting-label">Custom Voice ID</span><br><span class="setting-desc">Leave empty to use preset</span></div>
+        <input class="api-input" id="customVoice" style="width:200px;font-size:13px;padding:6px 10px" placeholder="e.g. pFZP5JQG7iQjIQuC4Bku" onchange="saveSetting('customVoiceId', this.value)">
+      </div>
+    </div>
+
+    <div class="section-title">TTS Model</div>
+    <div class="card">
+      <div class="setting-row">
+        <span class="setting-label">Model</span>
+        <select id="modelSelect" onchange="saveSetting('modelId', this.value)">
+          <option value="eleven_v3">v3 — Best quality</option>
+          <option value="eleven_flash_v2_5">Flash v2.5 — Fastest</option>
+          <option value="eleven_turbo_v2_5">Turbo v2.5 — Half cost</option>
+          <option value="eleven_multilingual_v2">Multilingual v2</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title">Voice Settings</div>
+    <div class="card">
+      <div class="slider-row"><div class="slider-header"><span>Speed</span><span class="slider-val" id="speedVal">1.00x</span></div><input type="range" id="speedSlider" min="0.7" max="1.2" step="0.05" value="1.0" oninput="updateSlider('speed',this.value,'x')"></div>
+      <div class="slider-row"><div class="slider-header"><span>Stability</span><span class="slider-val" id="stabilityVal">0.50</span></div><input type="range" id="stabilitySlider" min="0" max="1" step="0.05" value="0.5" oninput="updateSlider('stability',this.value)"></div>
+      <div class="slider-row"><div class="slider-header"><span>Similarity Boost</span><span class="slider-val" id="similarityBoostVal">0.75</span></div><input type="range" id="similarityBoostSlider" min="0" max="1" step="0.05" value="0.75" oninput="updateSlider('similarityBoost',this.value)"></div>
+      <div class="slider-row"><div class="slider-header"><span>Style</span><span class="slider-val" id="styleVal">0.00</span></div><input type="range" id="styleSlider" min="0" max="1" step="0.05" value="0" oninput="updateSlider('style',this.value)"></div>
+    </div>
+
+    <div class="section-title">STT Settings</div>
+    <div class="card">
+      <div class="setting-row">
+        <span class="setting-label">STT Model</span>
+        <select id="sttModelSelect" onchange="saveSetting('sttModelId', this.value)"><option value="scribe_v2">Scribe v2</option><option value="scribe_v1">Scribe v1</option></select>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Language</span>
+        <select id="sttLangSelect" onchange="saveSetting('sttLanguage', this.value)"><option value="">Auto-detect</option><option value="en">English</option><option value="ko">Korean</option><option value="ja">Japanese</option><option value="zh">Chinese</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option></select>
+      </div>
+    </div>
+
+    <button class="reset-btn" onclick="resetSettings()">Reset to Defaults</button>
+    <div class="footnote">Developed by Seokhyun Choung</div>
+  </div>
+</main>
+
+<script>
+// ── Test API Key (5,000 token limit) ──
+var TEST_API_KEY = 'f0045fbc2e314a11d97b0ae01de176e49bb448f389dada7d8887d1b7c5624a3d';
+
+// ── Config ──
+var DEFAULTS = { voiceId:'pFZP5JQG7iQjIQuC4Bku', customVoiceId:'', modelId:'eleven_flash_v2_5', speed:1.0, stability:0.5, similarityBoost:0.75, style:0.0, sttModelId:'scribe_v2', sttLanguage:'' };
+function getConfig() { try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('talkandlisten_config')||'{}')); } catch(e) { return Object.assign({}, DEFAULTS); } }
+function saveSetting(k,v) { var c=getConfig(); c[k]=v; localStorage.setItem('talkandlisten_config', JSON.stringify(c)); }
+function updateSlider(k,v,s) { s=s||''; document.getElementById(k+'Val').textContent=parseFloat(v).toFixed(2)+s; saveSetting(k,parseFloat(v)); }
+function resetSettings() { localStorage.setItem('talkandlisten_config', JSON.stringify(DEFAULTS)); loadSettingsUI(); }
+
+// ── API Key ──
+function getApiKey() { return localStorage.getItem('talkandlisten_api_key') || TEST_API_KEY; }
+function isUsingTestKey() { return !localStorage.getItem('talkandlisten_api_key'); }
+function saveApiKey() { var k=document.getElementById('apiInput').value.trim(); if(!k) return; localStorage.setItem('talkandlisten_api_key',k); document.getElementById('apiInput').value=''; updateApiStatus(); }
+function clearApiKey() { localStorage.removeItem('talkandlisten_api_key'); document.getElementById('apiInput').value=''; updateApiStatus(); }
+function updateApiStatus() {
+  var el=document.getElementById('apiStatus'), banner=document.getElementById('testerBanner');
+  if (isUsingTestKey()) {
+    el.innerHTML='<span class="status-dot test"></span><span>Tester Mode (5,000 token limit)</span>';
+    banner.style.display='block'; document.body.classList.add('has-banner');
+  } else {
+    el.innerHTML='<span class="status-dot on"></span><span>Connected</span>';
+    banner.style.display='none'; document.body.classList.remove('has-banner');
+  }
+}
+
+// ── Theme ──
+function getTheme() { return localStorage.getItem('talkandlisten_theme') || (window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light'); }
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  var icon=document.getElementById('themeIcon'), label=document.getElementById('themeLabel');
+  if (t==='dark') { icon.innerHTML='<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1z"/>'; label.textContent='Light'; }
+  else { icon.innerHTML='<path d="M12 3a9 9 0 109 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 01-4.4 2.26 5.403 5.403 0 01-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/>'; label.textContent='Dark'; }
+}
+function toggleTheme() { var t=getTheme()==='dark'?'light':'dark'; localStorage.setItem('talkandlisten_theme',t); applyTheme(t); }
+
+// ── Navigation ──
+function switchTab(name) {
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  document.getElementById('pg-'+name).classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+}
+
+// ── TTS ──
+var ttsAudio=null, ttsState='ready';
+function setTTSState(s) {
+  ttsState=s; var btn=document.getElementById('speakBtn'); btn.className='speak-btn '+s;
+  if(s==='ready') btn.innerHTML='▶ Speak'; else if(s==='loading') btn.innerHTML='⏳ Generating...'; else if(s==='playing') btn.innerHTML='⏹ Stop';
+}
+async function handleSpeak() {
+  if(ttsState==='loading') return; if(ttsState==='playing'){stopTTS();return;}
+  var text=document.getElementById('ttsText').value.trim();
+  if(!text){showError('ttsError','Please enter some text.');return;}
+  var apiKey=getApiKey(); if(!apiKey){showError('ttsError','Set your API key in Settings first.');return;}
+  hideError('ttsError'); setTTSState('loading');
+  var cfg=getConfig(), voiceId=cfg.customVoiceId||cfg.voiceId;
+  try {
+    var res=await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+voiceId+'/stream',{method:'POST',headers:{'xi-api-key':apiKey,'Content-Type':'application/json'},body:JSON.stringify({text:text,model_id:cfg.modelId,voice_settings:{stability:cfg.stability,similarity_boost:cfg.similarityBoost,style:cfg.style,speed:cfg.speed}})});
+    if(!res.ok){var e=await res.text();throw new Error('API error ('+res.status+'): '+e.slice(0,100));}
+    var blob=await res.blob(), url=URL.createObjectURL(blob); ttsAudio=new Audio(url);
+    var bar=document.getElementById('progressBar'),fill=document.getElementById('progressFill'); bar.classList.add('show');
+    ttsAudio.onplay=function(){setTTSState('playing');}; ttsAudio.ontimeupdate=function(){if(ttsAudio&&ttsAudio.duration)fill.style.width=(ttsAudio.currentTime/ttsAudio.duration*100)+'%';}; ttsAudio.onended=function(){setTTSState('ready');bar.classList.remove('show');fill.style.width='0';}; ttsAudio.onerror=function(){setTTSState('ready');bar.classList.remove('show');};
+    await ttsAudio.play();
+  } catch(e){showError('ttsError',e.message);setTTSState('ready');}
+}
+function stopTTS(){if(ttsAudio){ttsAudio.pause();ttsAudio.currentTime=0;ttsAudio=null;}setTTSState('ready');document.getElementById('progressBar').classList.remove('show');document.getElementById('progressFill').style.width='0';}
+
+// ── STT (Mic) ──
+var mediaRecorder=null,audioChunks=[],recStartTime=0,recTimer=null,sttState='idle',waveformCtx=null;
+function resetSTTState(){sttState='idle';if(recTimer){clearInterval(recTimer);recTimer=null;}document.getElementById('recBtn').classList.remove('recording');document.getElementById('recHint').textContent='Click to start recording';document.getElementById('recTime').textContent='';document.getElementById('waveform').style.display='none';if(waveformCtx){try{if(waveformCtx.state!=='closed')waveformCtx.close();}catch(e){}waveformCtx=null;}if(mediaRecorder&&mediaRecorder.stream){try{mediaRecorder.stream.getTracks().forEach(function(t){t.stop();});}catch(e){}}mediaRecorder=null;audioChunks=[];}
+async function handleRecord(){
+  if(sttState==='transcribing')return;if(sttState==='recording'){stopRecording();return;}
+  var apiKey=getApiKey();if(!apiKey){showError('sttError','Set your API key in Settings first.');return;}
+  hideError('sttError');document.getElementById('resultCard').classList.remove('show');
+  var stream=null;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:true}); audioChunks=[];
+    mediaRecorder=new MediaRecorder(stream,{mimeType:getMimeType()});
+    mediaRecorder.ondataavailable=function(e){if(e.data.size>0)audioChunks.push(e.data);};
+    mediaRecorder.onstop=function(){stream.getTracks().forEach(function(t){t.stop();});transcribeMic();};
+    mediaRecorder.start();sttState='recording';recStartTime=Date.now();
+    document.getElementById('recBtn').classList.add('recording');document.getElementById('recHint').textContent='Click to stop';
+    try{initWaveform(stream);}catch(e){}
+    recTimer=setInterval(function(){var el=(Date.now()-recStartTime)/1000,m=Math.floor(el/60),s=Math.floor(el%60),ms=Math.floor((el%1)*10);document.getElementById('recTime').textContent=m+':'+String(s).padStart(2,'0')+'.'+ms;},100);
+  }catch(e){if(stream){try{stream.getTracks().forEach(function(t){t.stop();});}catch(e2){}}showError('sttError','Microphone access denied.');resetSTTState();}
+}
+function getMimeType(){if(MediaRecorder.isTypeSupported('audio/webm'))return'audio/webm';if(MediaRecorder.isTypeSupported('audio/mp4'))return'audio/mp4';return'';}
+function stopRecording(){if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop();if(recTimer){clearInterval(recTimer);recTimer=null;}document.getElementById('recBtn').classList.remove('recording');document.getElementById('recHint').textContent='Transcribing...';document.getElementById('waveform').style.display='none';sttState='transcribing';if(waveformCtx){try{if(waveformCtx.state!=='closed')waveformCtx.close();}catch(e){}waveformCtx=null;}}
+async function transcribeMic(){
+  var apiKey=getApiKey(),cfg=getConfig(),mt=mediaRecorder?mediaRecorder.mimeType:'audio/webm',blob=new Blob(audioChunks,{type:mt}),ext=blob.type.includes('webm')?'webm':blob.type.includes('mp4')?'m4a':'wav';
+  var form=new FormData();form.append('model_id',cfg.sttModelId);form.append('file',blob,'recording.'+ext);if(cfg.sttLanguage)form.append('language_code',cfg.sttLanguage);
+  try{var res=await fetch('https://api.elevenlabs.io/v1/speech-to-text',{method:'POST',headers:{'xi-api-key':apiKey},body:form});if(!res.ok){var e=await res.text();throw new Error('API error ('+res.status+'): '+e.slice(0,100));}var json=await res.json(),text=json.text||'(No result)';document.getElementById('resultBody').textContent=text;document.getElementById('resultCard').classList.add('show');}catch(e){showError('sttError',e.message);}
+  resetSTTState();
+}
+
+// ── STT (File Upload) ──
+var uploadedFile=null;
+function handleFileSelect(e){var f=e.target.files[0];if(f)setFile(f);}
+function setFile(f){uploadedFile=f;document.getElementById('fileName').textContent=f.name;document.getElementById('fileInfo').classList.add('show');document.getElementById('transcribeBtn').classList.add('show');}
+function clearFile(){uploadedFile=null;document.getElementById('fileInput').value='';document.getElementById('fileInfo').classList.remove('show');document.getElementById('transcribeBtn').classList.remove('show');}
+async function transcribeFile(){
+  if(!uploadedFile)return;var apiKey=getApiKey();if(!apiKey){showError('sttError','Set your API key in Settings first.');return;}
+  hideError('sttError');document.getElementById('resultCard').classList.remove('show');
+  var btn=document.getElementById('transcribeBtn');btn.textContent='Transcribing...';btn.disabled=true;
+  var cfg=getConfig(),form=new FormData();form.append('model_id',cfg.sttModelId);form.append('file',uploadedFile,uploadedFile.name);if(cfg.sttLanguage)form.append('language_code',cfg.sttLanguage);
+  try{var res=await fetch('https://api.elevenlabs.io/v1/speech-to-text',{method:'POST',headers:{'xi-api-key':apiKey},body:form});if(!res.ok){var e=await res.text();throw new Error('API error ('+res.status+'): '+e.slice(0,100));}var json=await res.json(),text=json.text||'(No result)';document.getElementById('resultBody').textContent=text;document.getElementById('resultCard').classList.add('show');}catch(e){showError('sttError',e.message);}
+  btn.textContent='Transcribe File';btn.disabled=false;
+}
+// Drag & drop
+var dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('dragover');});
+dz.addEventListener('dragleave',function(e){e.preventDefault();dz.classList.remove('dragover');});
+dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('dragover');var f=e.dataTransfer.files[0];if(f&&(f.type.startsWith('audio/')||/\.(mp3|wav|m4a|webm|ogg|flac|aac)$/i.test(f.name)))setFile(f);else if(f)showError('sttError','Please drop an audio file.');});
+
+// ── Waveform ──
+function initWaveform(stream){var wf=document.getElementById('waveform');wf.style.display='flex';wf.innerHTML='';for(var i=0;i<32;i++){var b=document.createElement('div');b.className='bar';b.style.height='4px';wf.appendChild(b);}try{waveformCtx=new(window.AudioContext||window.webkitAudioContext)();var src=waveformCtx.createMediaStreamSource(stream),an=waveformCtx.createAnalyser();an.fftSize=64;src.connect(an);var data=new Uint8Array(an.frequencyBinCount);(function draw(){if(sttState!=='recording')return;try{an.getByteFrequencyData(data);var bars=wf.children;for(var i=0;i<bars.length;i++){var v=data[i%data.length]/255;bars[i].style.height=Math.max(4,v*36)+'px';}}catch(e){return;}requestAnimationFrame(draw);})();}catch(e){}}
+
+// ── Helpers ──
+function showError(id,msg){var el=document.getElementById(id);el.textContent=msg;el.style.display='block';}
+function hideError(id){document.getElementById(id).style.display='none';}
+function copyResult(){var t=document.getElementById('resultBody').textContent;navigator.clipboard.writeText(t).then(function(){var b=document.querySelector('#resultCard button');var o=b.textContent;b.textContent='Copied!';setTimeout(function(){b.textContent=o;},1500);});}
+document.getElementById('ttsText').addEventListener('input',function(){document.getElementById('charCount').textContent=this.value.length;this.classList.remove('has-default');});
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();handleSpeak();return;}
+  if(e.key==='Escape'){e.preventDefault();if(ttsState==='playing')stopTTS();else if(sttState==='recording')stopRecording();return;}
+  var tag=document.activeElement?document.activeElement.tagName:'';if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;
+  if(e.key==='1')switchTab('speak');else if(e.key==='2')switchTab('listen');else if(e.key==='3')switchTab('settings');
+});
+
+// ── Init ──
+function loadSettingsUI(){var c=getConfig();document.getElementById('quickVoice').value=c.voiceId;document.getElementById('voiceSelect').value=c.voiceId;document.getElementById('customVoice').value=c.customVoiceId;document.getElementById('modelSelect').value=c.modelId;document.getElementById('speedSlider').value=c.speed;document.getElementById('speedVal').textContent=c.speed.toFixed(2)+'x';document.getElementById('stabilitySlider').value=c.stability;document.getElementById('stabilityVal').textContent=c.stability.toFixed(2);document.getElementById('similarityBoostSlider').value=c.similarityBoost;document.getElementById('similarityBoostVal').textContent=c.similarityBoost.toFixed(2);document.getElementById('styleSlider').value=c.style;document.getElementById('styleVal').textContent=c.style.toFixed(2);document.getElementById('sttModelSelect').value=c.sttModelId;document.getElementById('sttLangSelect').value=c.sttLanguage;updateApiStatus();}
+applyTheme(getTheme());
+loadSettingsUI();
+</script>
+</body>
+</html>

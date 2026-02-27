@@ -1,0 +1,12 @@
+<svg width="280" height="52" viewBox="0 0 280 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Icon -->
+  <rect x="2" y="2" width="48" height="48" rx="12" fill="#0a84ff"/>
+  <circle cx="19" cy="26" r="10" fill="white" fill-opacity="0.13"/>
+  <path d="M15.5 24v4h2.2l2.8 2.8V21.2L18 24h-2.5z" fill="white"/>
+  <path d="M22.5 23.5c0 .8-.5 1.5-1.2 1.8v-3.6c.7.3 1.2 1 1.2 1.8z" fill="white" opacity="0.6"/>
+  <circle cx="33" cy="26" r="10" fill="white" fill-opacity="0.13"/>
+  <rect x="31" y="21" width="4" height="7" rx="2" fill="white" opacity="0.9"/>
+  <path d="M29 26v1c0 2.2 1.8 4 4 4s4-1.8 4-4v-1" stroke="white" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.7"/>
+  <!-- Wordmark -->
+  <text x="64" y="33" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="700" font-size="24" letter-spacing="-0.5" fill="#111111">Talk<tspan fill="#0a84ff">&amp;</tspan>Listen</text>
+</svg>
